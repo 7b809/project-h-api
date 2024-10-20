@@ -8,26 +8,26 @@ exports.handler = async (event, context) => {
     const limit = 40; 
     const skip = pageNumber ? (pageNumber - 1) * limit : 0; 
 
-    // Handle OPTIONS request for CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 204,
-            headers: {
-                'Access-Control-Allow-Origin': '*', // Allow all origins
-                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS
-                'Access-Control-Allow-Headers': 'Content-Type', // Allow content type headers
-            },
-        };
-    }
-
     try {
+        // Handle preflight OPTIONS request
+        if (event.httpMethod === 'OPTIONS') {
+            return {
+                statusCode: 200,
+                headers: {
+                    'Access-Control-Allow-Origin': '*', // or your specific domain
+                    'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow methods
+                    'Access-Control-Allow-Headers': 'Content-Type', // Allow specific headers
+                },
+                body: JSON.stringify({}),
+            };
+        }
+
         await client.connect();
         const db = client.db('project-h');
         const collection = db.collection('api-img');
 
         let documents;
 
-        // Fetch documents based on page number
         if (isNaN(pageNumber)) {
             documents = await collection.find({})
                 .project({ _id: 0, title: 1 }) // Only fetch the title field
@@ -40,26 +40,20 @@ exports.handler = async (event, context) => {
                 .toArray();
         }
 
-        // Check if documents were found
         if (documents.length === 0 && !isNaN(pageNumber)) {
             return {
                 statusCode: 404,
                 headers: {
                     'Access-Control-Allow-Origin': '*', // Allow all origins
-                    'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS
-                    'Access-Control-Allow-Headers': 'Content-Type', // Allow content type headers
                 },
                 body: JSON.stringify({ error: 'No documents found for this page' }),
             };
         }
 
-        // Successful response with documents
         return {
             statusCode: 200,
             headers: {
                 'Access-Control-Allow-Origin': '*', // Allow all origins
-                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS
-                'Access-Control-Allow-Headers': 'Content-Type', // Allow content type headers
                 'Content-Type': 'application/json', // Set content type to JSON
             },
             body: JSON.stringify(documents), 
@@ -69,8 +63,6 @@ exports.handler = async (event, context) => {
             statusCode: 500,
             headers: {
                 'Access-Control-Allow-Origin': '*', // Allow all origins
-                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS
-                'Access-Control-Allow-Headers': 'Content-Type', // Allow content type headers
             },
             body: JSON.stringify({ error: 'Failed to fetch data' }),
         };
