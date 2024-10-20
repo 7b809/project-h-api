@@ -9,19 +9,6 @@ exports.handler = async (event, context) => {
     const skip = pageNumber ? (pageNumber - 1) * limit : 0; 
 
     try {
-        // Handle preflight OPTIONS request
-        if (event.httpMethod === 'OPTIONS') {
-            return {
-                statusCode: 200,
-                headers: {
-                    'Access-Control-Allow-Origin': '*', // or your specific domain
-                    'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow methods
-                    'Access-Control-Allow-Headers': 'Content-Type', // Allow specific headers
-                },
-                body: JSON.stringify({}),
-            };
-        }
-
         await client.connect();
         const db = client.db('project-h');
         const collection = db.collection('api-img');
@@ -69,4 +56,4 @@ exports.handler = async (event, context) => {
     } finally {
         await client.close();
     }
-};
+}; 
