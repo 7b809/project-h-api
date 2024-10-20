@@ -1,53 +1,40 @@
 const { MongoClient } = require('mongodb');
 
 exports.handler = async (event, context) => {
-    const mongoUrl = process.env.MONGO_URL; 
+    const mongoUrl = process.env.MONGO_URL; // Use environment variable for MongoDB URL
     const client = new MongoClient(mongoUrl);
-    const pathParts = event.path.split('/');
-    const pageNumber = parseInt(pathParts[pathParts.length - 1], 10); 
-    const limit = 40; 
-    const skip = pageNumber ? (pageNumber - 1) * limit : 0; 
 
-    // Handle OPTIONS request for CORS preflight
-    if (event.httpMethod === 'OPTIONS') {
-        return {
-            statusCode: 204,
-            headers: {
-                'Access-Control-Allow-Origin': '*', // Allow all origins
-                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS
-                'Access-Control-Allow-Headers': 'Content-Type', // Allow content type headers
-            },
-        };
-    }
+    // Extract the path from the event object
+    const pathParts = event.path.split('/');
+    const pageNumber = parseInt(pathParts[pathParts.length - 1], 10); // Get the last part of the path
+    const limit = 40; // Number of documents to return per page
+    const skip = pageNumber ? (pageNumber - 1) * limit : 0; // Calculate the number of documents to skip
 
     try {
         await client.connect();
         const db = client.db('project-h');
         const collection = db.collection('api-img');
 
-        let documents;
-
-        if (isNaN(pageNumber)) {
-            documents = await collection.find({})
-                .project({ _id: 0, title: 1 }) // Only fetch the title field
-                .toArray();
-        } else {
-            documents = await collection.find({})
-                .project({ _id: 0, title: 1 }) // Only fetch the title field
-                .skip(skip)
-                .limit(limit)
-                .toArray();
-        }
-
-        if (documents.length === 0 && !isNaN(pageNumber)) {
+        // Fetch documents with pagination
+        const documents = await collection.find({})
+            .skip(skip)        // Skip the first 'skip' documents
+            .limit(limit)      // Limit the results to 'limit' documents
+            .toArray();        // Convert the result to an array
+        
+        // Check if any documents were found
+        if (documents.length === 0) {
             return {
                 statusCode: 404,
                 headers: {
                     'Access-Control-Allow-Origin': '*', // Allow all origins
+                    'Content-Type': 'application/json', // Set content type to JSON
                 },
                 body: JSON.stringify({ error: 'No documents found for this page' }),
             };
         }
+
+        // Remove the "_id" field from each document
+        const sanitizedDocuments = documents.map(({ _id, ...rest }) => rest);
 
         return {
             statusCode: 200,
@@ -55,13 +42,14 @@ exports.handler = async (event, context) => {
                 'Access-Control-Allow-Origin': '*', // Allow all origins
                 'Content-Type': 'application/json', // Set content type to JSON
             },
-            body: JSON.stringify(documents), 
+            body: JSON.stringify(sanitizedDocuments), // Send the sanitized documents as a response
         };
     } catch (error) {
         return {
             statusCode: 500,
             headers: {
                 'Access-Control-Allow-Origin': '*', // Allow all origins
+                'Content-Type': 'application/json', // Set content type to JSON
             },
             body: JSON.stringify({ error: 'Failed to fetch data' }),
         };
