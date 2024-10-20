@@ -8,6 +8,18 @@ exports.handler = async (event, context) => {
     const limit = 40; 
     const skip = pageNumber ? (pageNumber - 1) * limit : 0; 
 
+    // Handle OPTIONS request for CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+        return {
+            statusCode: 204,
+            headers: {
+                'Access-Control-Allow-Origin': '*', // Allow all origins
+                'Access-Control-Allow-Methods': 'GET, OPTIONS', // Allow GET and OPTIONS
+                'Access-Control-Allow-Headers': 'Content-Type', // Allow content type headers
+            },
+        };
+    }
+
     try {
         await client.connect();
         const db = client.db('project-h');
@@ -56,4 +68,4 @@ exports.handler = async (event, context) => {
     } finally {
         await client.close();
     }
-}; 
+};
