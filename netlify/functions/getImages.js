@@ -1,4 +1,3 @@
-// netlify/functions/getImages.js
 const { MongoClient } = require('mongodb');
 
 exports.handler = async (event, context) => {
@@ -21,6 +20,9 @@ exports.handler = async (event, context) => {
             if (index < 0 || index >= documents.length) {
                 return {
                     statusCode: 404,
+                    headers: {
+                        'Access-Control-Allow-Origin': '*', // Allow all origins
+                    },
                     body: JSON.stringify({ error: 'Document not found' }),
                 };
             }
@@ -29,6 +31,9 @@ exports.handler = async (event, context) => {
 
             return {
                 statusCode: 200,
+                headers: {
+                    'Access-Control-Allow-Origin': '*', // Allow all origins
+                },
                 body: JSON.stringify(rest), // Send the sanitized document as a response
             };
         } else {
@@ -39,12 +44,18 @@ exports.handler = async (event, context) => {
 
             return {
                 statusCode: 200,
+                headers: {
+                    'Access-Control-Allow-Origin': '*', // Allow all origins
+                },
                 body: JSON.stringify(sanitizedDocuments), // Send all documents as a response
             };
         }
     } catch (error) {
         return {
             statusCode: 500,
+            headers: {
+                'Access-Control-Allow-Origin': '*', // Allow all origins
+            },
             body: JSON.stringify({ error: 'Failed to fetch data' }),
         };
     } finally {
