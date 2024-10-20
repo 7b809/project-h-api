@@ -6,56 +6,52 @@ exports.handler = async (event, context) => {
 
     // Extract the path from the event object
     const pathParts = event.path.split('/');
-    const index = parseInt(pathParts[pathParts.length - 1], 10); // Get the last part of the path
+    const pageNumber = parseInt(pathParts[pathParts.length - 1], 10); // Get the last part of the path
+    const limit = 40; // Number of documents to return per page
+    const skip = pageNumber ? (pageNumber - 1) * limit : 0; // Calculate the number of documents to skip
 
     try {
         await client.connect();
         const db = client.db('project-h');
         const collection = db.collection('api-img');
 
-        if (!isNaN(index)) {
-            // If an index is provided in the URL
-            const documents = await collection.find().toArray();
-            // Check if the index is valid
-            if (index < 0 || index >= documents.length) {
-                return {
-                    statusCode: 404,
-                    headers: {
-                        'Access-Control-Allow-Origin': '*', // Allow all origins
-                    },
-                    body: JSON.stringify({ error: 'Document not found' }),
-                };
-            }
-            // Remove the "_id" field from the specified document
-            const { _id, ...rest } = documents[index];
-
-            return {
-                statusCode: 200,
-                headers: {
-                    'Access-Control-Allow-Origin': '*', // Allow all origins
-                },
-                body: JSON.stringify(rest), // Send the sanitized document as a response
-            };
-        } else {
-            // Fetch all documents if no index is provided
-            const documents = await collection.find().toArray();
+        if (isNaN(pageNumber)) {
+            // If no page number is provided, fetch all documents
+            const documents = await collection.find({}).toArray();
+            
             // Remove the "_id" field from each document
             const sanitizedDocuments = documents.map(({ _id, ...rest }) => rest);
 
             return {
                 statusCode: 200,
-                headers: {
-                    'Access-Control-Allow-Origin': '*', // Allow all origins
-                },
                 body: JSON.stringify(sanitizedDocuments), // Send all documents as a response
+            };
+        } else {
+            // If a page number is provided, fetch documents with pagination
+            const documents = await collection.find({})
+                .skip(skip)        // Skip the first 'skip' documents
+                .limit(limit)      // Limit the results to 'limit' documents
+                .toArray();        // Convert the result to an array
+            
+            // Check if any documents were found
+            if (documents.length === 0) {
+                return {
+                    statusCode: 404,
+                    body: JSON.stringify({ error: 'No documents found for this page' }),
+                };
+            }
+
+            // Remove the "_id" field from each document
+            const sanitizedDocuments = documents.map(({ _id, ...rest }) => rest);
+
+            return {
+                statusCode: 200,
+                body: JSON.stringify(sanitizedDocuments), // Send the sanitized documents as a response
             };
         }
     } catch (error) {
         return {
             statusCode: 500,
-            headers: {
-                'Access-Control-Allow-Origin': '*', // Allow all origins
-            },
             body: JSON.stringify({ error: 'Failed to fetch data' }),
         };
     } finally {
