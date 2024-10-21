@@ -76,7 +76,7 @@ exports.handler = async (event, context) => {
         }
     }
 
-    // Handle POST request for tags
+    // Handle POST request for tags data
     if (event.httpMethod === 'POST' && lastPathPart === 'tags-data') {
         try {
             await client.connect();
