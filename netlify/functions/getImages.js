@@ -1,3 +1,4 @@
+// getImages.js
 const { MongoClient } = require('mongodb');
 
 exports.handler = async (event, context) => {
@@ -17,42 +18,24 @@ exports.handler = async (event, context) => {
         };
     }
 
-    // Extract the path from the event object
     const pathParts = event.path.split('/');
     const lastPathPart = pathParts[pathParts.length - 1];
 
     const limit = 40; // Number of documents to return per page
     let skip = 0; // Default skip
 
-    // Default to api-img route unless path is /tags
-    let isTagsRoute = false;
-
-    // Check if the route is /tags
-    if (lastPathPart === 'tags') {
-        isTagsRoute = true;
-    } else {
-        const pageNumber = parseInt(lastPathPart, 10); // Get the last part of the path for pagination
-        skip = pageNumber ? (pageNumber - 1) * limit : 0; // Calculate the number of documents to skip
-    }
+    const pageNumber = parseInt(lastPathPart, 10); // Get the last part of the path for pagination
+    skip = pageNumber ? (pageNumber - 1) * limit : 0; // Calculate the number of documents to skip
 
     try {
         await client.connect();
         const db = client.db('project-h');
 
-        let documents;
-
-        // Check the route to determine which collection to query
-        if (isTagsRoute) {
-            const tagsCollection = db.collection('tags_summary'); // New tags collection
-            // Fetch only the "tags" field from the tags_summary collection
-            documents = await tagsCollection.find({}, { projection: { tags: 1 } }).toArray(); 
-        } else {
-            const apiCollection = db.collection('api-img'); // Existing collection
-            documents = await apiCollection.find({})
-                .skip(skip)        // Skip the first 'skip' documents
-                .limit(limit)      // Limit the results to 'limit' documents
-                .toArray();        // Convert the result to an array
-        }
+        const apiCollection = db.collection('api-img'); // Existing collection
+        const documents = await apiCollection.find({})
+            .skip(skip)        // Skip the first 'skip' documents
+            .limit(limit)      // Limit the results to 'limit' documents
+            .toArray();        // Convert the result to an array
 
         // Check if any documents were found
         if (documents.length === 0) {
@@ -66,7 +49,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Remove the "_id" field from each document if not in /tags route
+        // Remove the "_id" field from each document
         const sanitizedDocuments = documents.map(({ _id, ...rest }) => rest);
 
         return {
