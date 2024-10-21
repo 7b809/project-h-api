@@ -65,15 +65,18 @@ exports.handler = async (event, context) => {
             const apiCollection = db.collection('api-img');
             const images = await apiCollection.find({ serial_no: { $in: uniqueSerialNumbers } }).toArray(); // Query based on serial_no
 
+            // Limit the number of returned images to 2
+            const limitedImages = images.slice(0, 2); // Get only the first two images
+
             // Check if images were found
-            if (images.length > 0) {
+            if (limitedImages.length > 0) {
                 return {
                     statusCode: 200,
                     headers: {
                         'Access-Control-Allow-Origin': '*', // Change this to your domain
                         'Content-Type': 'application/json', // Set content type to JSON
                     },
-                    body: JSON.stringify(images), // Send the entire document structure as a response
+                    body: JSON.stringify(limitedImages), // Send the limited document structure as a response
                 };
             } else {
                 return {
@@ -101,7 +104,6 @@ exports.handler = async (event, context) => {
 
     // For GET request handling (if needed)
     if (event.httpMethod === 'GET') {
-        // Here you could implement GET handling if required
         return {
             statusCode: 405, // Method Not Allowed
             headers: {
