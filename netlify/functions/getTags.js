@@ -66,9 +66,9 @@ exports.handler = async (event, context) => {
             const db = client.db('project-h');
             const imgSummaryCollection = db.collection('img_summary');
 
-            // Find all documents that match the tags in the tagsList (case-insensitive matching)
+            // Find all documents that match the tags in the tagsList (case-sensitive matching)
             const results = await imgSummaryCollection.find({
-                tags: { $elemMatch: { $in: tagsList.map(tag => tag.toLowerCase()) } } // Ensure tags are in lowercase
+                tags: { $in: tagsList } // Keep the case as is
             }).toArray();
 
             // Extract serial_number_list from the results
@@ -76,8 +76,8 @@ exports.handler = async (event, context) => {
 
             results.forEach(doc => {
                 doc.tag_data.forEach(tagData => {
-                    // Only add serial numbers if the tag name matches (also in lowercase)
-                    if (tagsList.includes(tagData.tag_name.toLowerCase())) {
+                    // Only add serial numbers if the tag name matches (case-sensitive)
+                    if (tagsList.includes(tagData.tag_name)) {
                         tagData.serial_number_list.forEach(serialNumber => {
                             serialNumberSets.add(serialNumber); // Add serial number to the Set
                         });
