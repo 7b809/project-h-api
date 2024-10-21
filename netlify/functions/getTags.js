@@ -9,107 +9,113 @@ exports.handler = async (event, context) => {
         return {
             statusCode: 204, // No content
             headers: {
-                'Access-Control-Allow-Origin': '*', // Change this to your domain
+                'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Credentials': 'true',
                 'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS,POST,PUT',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization', // Add any custom headers you need
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
             },
         };
     }
 
-    // Check the route
+    // Check if the route is /tags
     const pathParts = event.path.split('/');
     const lastPathPart = pathParts[pathParts.length - 1];
 
-    if (lastPathPart === 'tags') {
-        if (event.httpMethod === 'GET') {
-            try {
-                await client.connect();
-                const db = client.db('project-h');
+    if (lastPathPart !== 'tags') {
+        return {
+            statusCode: 404,
+            headers: {
+                'Access-Control-Allow-Origin': '*',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ error: 'Not Found' }),
+        };
+    }
 
-                const tagsCollection = db.collection('tags_summary'); // New tags collection
-                // Fetch only the "tags" field from the tags_summary collection
-                const documents = await tagsCollection.find({}, { projection: { tags: 1 } }).toArray();
+    // Handle POST request
+    if (event.httpMethod === 'POST') {
+        let requestBody;
+        try {
+            requestBody = JSON.parse(event.body);
+        } catch (error) {
+            return {
+                statusCode: 400,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ error: 'Invalid JSON' }),
+            };
+        }
 
-                // Check if any documents were found
-                if (documents.length === 0) {
-                    return {
-                        statusCode: 404,
-                        headers: {
-                            'Access-Control-Allow-Origin': '*', // Change this to your domain
-                            'Content-Type': 'application/json', // Set content type to JSON
-                        },
-                        body: JSON.stringify({ error: 'No documents found' }),
-                    };
-                }
+        const tagsList = requestBody.tags;
 
-                // Remove the "_id" field from each document
-                const sanitizedDocuments = documents.map(({ _id, ...rest }) => rest);
+        if (!Array.isArray(tagsList) || tagsList.length === 0) {
+            return {
+                statusCode: 400,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ error: 'Tags must be a non-empty array' }),
+            };
+        }
 
-                return {
-                    statusCode: 200,
-                    headers: {
-                        'Access-Control-Allow-Origin': '*', // Change this to your domain
-                        'Content-Type': 'application/json', // Set content type to JSON
-                    },
-                    body: JSON.stringify(sanitizedDocuments), // Send the sanitized documents as a response
-                };
-            } catch (error) {
-                return {
-                    statusCode: 500,
-                    headers: {
-                        'Access-Control-Allow-Origin': '*', // Change this to your domain
-                        'Content-Type': 'application/json', // Set content type to JSON
-                    },
-                    body: JSON.stringify({ error: 'Failed to fetch data' }),
-                };
-            } finally {
-                await client.close();
-            }
-        } else if (event.httpMethod === 'POST') {
-            try {
-                const { tags } = JSON.parse(event.body); // Expecting a JSON body with "tags" field
-                if (!Array.isArray(tags)) {
-                    return {
-                        statusCode: 400,
-                        headers: {
-                            'Access-Control-Allow-Origin': '*', // Change this to your domain
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({ error: 'Invalid input: tags should be an array' }),
-                    };
-                }
+        try {
+            await client.connect();
+            const db = client.db('project-h');
+            const imgSummaryCollection = db.collection('img_summary');
 
-                // Convert tags to lowercase
-                const lowercaseTags = tags.map(tag => tag.toLowerCase());
+            // Find all documents that match the tags in the tagsList
+            const results = await imgSummaryCollection.find({
+                tags: { $in: tagsList.map(tag => tag.toLowerCase()) } // Ensure tags are in lowercase
+            }).toArray();
 
-                return {
-                    statusCode: 200,
-                    headers: {
-                        'Access-Control-Allow-Origin': '*', // Change this to your domain
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(lowercaseTags), // Send the lowercase tags as a response
-                };
-            } catch (error) {
-                return {
-                    statusCode: 500,
-                    headers: {
-                        'Access-Control-Allow-Origin': '*', // Change this to your domain
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ error: 'Failed to process input' }),
-                };
-            }
+            // Extract serial_number_list from the results
+            const serialNumberSets = new Set(); // Using a Set to avoid duplicates
+
+            results.forEach(doc => {
+                doc.tag_data.forEach(tagData => {
+                    // Only add serial numbers if the tag name matches
+                    if (tagsList.includes(tagData.tag_name)) {
+                        tagData.serial_number_list.forEach(serialNumber => {
+                            serialNumberSets.add(serialNumber); // Add serial number to the Set
+                        });
+                    }
+                });
+            });
+
+            // Convert the Set to an array
+            const serialNumberList = Array.from(serialNumberSets);
+
+            return {
+                statusCode: 200,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ serial_number_list: serialNumberList }),
+            };
+        } catch (error) {
+            return {
+                statusCode: 500,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ error: 'Failed to fetch data' }),
+            };
+        } finally {
+            await client.close();
         }
     }
 
     return {
-        statusCode: 404,
+        statusCode: 405,
         headers: {
             'Access-Control-Allow-Origin': '*',
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ error: 'Not Found' }),
+        body: JSON.stringify({ error: 'Method Not Allowed' }),
     };
 };
