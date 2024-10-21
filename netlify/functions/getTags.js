@@ -1,5 +1,17 @@
 const { MongoClient } = require('mongodb');
 
+// Function to seed the random number generator
+const seedRandom = (seed) => {
+    let m = 0x80000000, // 2**31
+        a = 1103515245, // Random number generator parameters
+        c = 12345;
+    let state = seed % m;
+    return () => {
+        state = (a * state + c) % m;
+        return state / m;
+    };
+};
+
 exports.handler = async (event, context) => {
     const mongoUrl = process.env.MONGO_URL; // Use environment variable for MongoDB URL
     const client = new MongoClient(mongoUrl);
@@ -20,37 +32,6 @@ exports.handler = async (event, context) => {
     // Split the path to determine the route
     const pathParts = event.path.split('/');
     const lastPathPart = pathParts[pathParts.length - 1];
-
-    // GET /tags route
-    if (lastPathPart === 'tags' && event.httpMethod === 'GET') {
-        try {
-            await client.connect();
-            const db = client.db('project-h');
-            const imgSummaryCollection = db.collection('tags_summary');
-
-            // Fetch all tags (adjust the query based on your data structure)
-            const results = await imgSummaryCollection.distinct('tags'); // Assuming 'tags' is the field for tags
-            return {
-                statusCode: 200,
-                headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ tags: results }),
-            };
-        } catch (error) {
-            return {
-                statusCode: 500,
-                headers: {
-                    'Access-Control-Allow-Origin': '*',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ error: 'Failed to fetch tags' }),
-            };
-        } finally {
-            await client.close();
-        }
-    }
 
     // POST /tags/tags-data route
     if (lastPathPart === 'tags-data' && event.httpMethod === 'POST') {
@@ -105,8 +86,27 @@ exports.handler = async (event, context) => {
                 });
             }
 
-            // Convert the Set to an array and limit to the first 40
-            const serialNumberList = Array.from(serialNumberSets).slice(0, 40);
+            // Convert the Set to an array
+            const serialNumberArray = Array.from(serialNumberSets);
+
+            // Get the current timestamp in seconds as seed
+            const currentTimestamp = Math.floor(Date.now() / 1000);
+            const random = seedRandom(currentTimestamp);
+
+            // Shuffle the array with seeded randomization
+            const shuffleArray = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+
+            // Shuffle the serial numbers
+            const shuffledSerialNumbers = shuffleArray(serialNumberArray);
+
+            // Limit to the first 60
+            const serialNumberList = shuffledSerialNumbers.slice(0, 60);
             const apiDataList = [];
 
             // Fetch data for each serial number from the api-img collection
