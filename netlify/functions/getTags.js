@@ -11,29 +11,49 @@ exports.handler = async (event, context) => {
             headers: {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Credentials': 'true',
-                'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS,POST,PUT',
+                'Access-Control-Allow-Methods': 'GET,HEAD,OPTIONS,POST',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization',
             },
         };
     }
 
-    // Check if the route is /tags
+    // Split the path to determine the route
     const pathParts = event.path.split('/');
     const lastPathPart = pathParts[pathParts.length - 1];
 
-    if (lastPathPart !== 'tags') {
-        return {
-            statusCode: 404,
-            headers: {
-                'Access-Control-Allow-Origin': '*',
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ error: 'Not Found' }),
-        };
+    // GET /tags route
+    if (lastPathPart === 'tags' && event.httpMethod === 'GET') {
+        try {
+            await client.connect();
+            const db = client.db('project-h');
+            const imgSummaryCollection = db.collection('img_summary');
+
+            // Fetch all tags (adjust the query based on your data structure)
+            const results = await imgSummaryCollection.distinct('tags'); // Assuming 'tags' is the field for tags
+            return {
+                statusCode: 200,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ tags: results }),
+            };
+        } catch (error) {
+            return {
+                statusCode: 500,
+                headers: {
+                    'Access-Control-Allow-Origin': '*',
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ error: 'Failed to fetch tags' }),
+            };
+        } finally {
+            await client.close();
+        }
     }
 
-    // Handle POST request
-    if (event.httpMethod === 'POST') {
+    // POST /tags/tags-data route
+    if (lastPathPart === 'tags-data' && event.httpMethod === 'POST') {
         let requestBody;
         try {
             requestBody = JSON.parse(event.body);
@@ -64,29 +84,40 @@ exports.handler = async (event, context) => {
         try {
             await client.connect();
             const db = client.db('project-h');
-            const imgSummaryCollection = db.collection('img_summary');
+            const imgSummaryCollection = db.collection('tags_summary');
+            const apiImgCollection = db.collection('api-img');
 
-            // Find all documents that match the tags in the tagsList (case-sensitive matching)
-            const results = await imgSummaryCollection.find({
-                tags: { $in: tagsList } // Keep the case as is
-            }).toArray();
+            // Create a set to hold unique serial numbers
+            const serialNumberSets = new Set(); 
 
-            // Extract serial_number_list from the results
-            const serialNumberSets = new Set(); // Using a Set to avoid duplicates
-
-            results.forEach(doc => {
-                doc.tag_data.forEach(tagData => {
-                    // Only add serial numbers if the tag name matches (case-sensitive)
-                    if (tagsList.includes(tagData.tag_name)) {
-                        tagData.serial_number_list.forEach(serialNumber => {
-                            serialNumberSets.add(serialNumber); // Add serial number to the Set
-                        });
-                    }
+            // Iterate through each tag in tagsList
+            for (const tag of tagsList) {
+                const results = await imgSummaryCollection.find({ 'tag_data.tag_name': tag }).toArray();
+                
+                results.forEach(doc => {
+                    doc.tag_data.forEach(tagData => {
+                        if (tagData.tag_name === tag) {
+                            tagData.serial_number_list.forEach(serialNumber => {
+                                serialNumberSets.add(serialNumber);
+                            });
+                        }
+                    });
                 });
-            });
+            }
 
-            // Convert the Set to an array
-            const serialNumberList = Array.from(serialNumberSets);
+            // Convert the Set to an array and limit to the first 40
+            const serialNumberList = Array.from(serialNumberSets).slice(0, 40);
+            const apiDataList = [];
+
+            // Fetch data for each serial number from the api-img collection
+            for (const serialNo of serialNumberList) {
+                const apiData = await apiImgCollection.findOne({ serial_no: serialNo });
+                if (apiData) {
+                    const apiDataCleaned = { ...apiData };
+                    delete apiDataCleaned._id; // Remove MongoDB id
+                    apiDataList.push(apiDataCleaned);
+                }
+            }
 
             return {
                 statusCode: 200,
@@ -94,7 +125,7 @@ exports.handler = async (event, context) => {
                     'Access-Control-Allow-Origin': '*',
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ serial_number_list: serialNumberList }),
+                body: JSON.stringify({ api_data_list: apiDataList }),
             };
         } catch (error) {
             return {
