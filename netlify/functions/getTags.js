@@ -106,7 +106,15 @@ exports.handler = async (event, context) => {
             }
 
             // Convert the Set to an array and limit to the first 40
-            const serialNumberList = Array.from(serialNumberSets).slice(0, 40);
+            // Convert the Set to an array
+            const randomSerialNumberList = Array.from(serialNumberSets);
+            
+            // Shuffle the array
+            const shuffledArray = randomSerialNumberList.sort(() => 0.5 - Math.random());
+            
+            // Limit to the first 60 random elements
+            const serialNumberList = shuffledArray.slice(0, 60);
+
             const apiDataList = [];
 
             // Fetch data for each serial number from the api-img collection
