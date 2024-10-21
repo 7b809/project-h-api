@@ -66,10 +66,11 @@ exports.handler = async (event, context) => {
             const db = client.db('project-h');
             const imgSummaryCollection = db.collection('img_summary');
 
-            // Find all documents that match the tags in the tagsList
-            const results = await imgSummaryCollection.find({
-                tags: { $in: tagsList.map(tag => tag.toLowerCase()) } // Ensure tags are in lowercase
-            }).toArray();
+        // Find all documents that match the tags in the tagsList
+        const results = await imgSummaryCollection.find({
+            tags: { $elemMatch: { $in: tagsList.map(tag => tag.toLowerCase()) } } // Using $elemMatch for case-insensitive matching
+        }).toArray();
+
 
             // Extract serial_number_list from the results
             const serialNumberSets = new Set(); // Using a Set to avoid duplicates
