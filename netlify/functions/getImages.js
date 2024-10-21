@@ -44,7 +44,8 @@ exports.handler = async (event, context) => {
         // Check the route to determine which collection to query
         if (isTagsRoute) {
             const tagsCollection = db.collection('tags_summary'); // New tags collection
-            documents = await tagsCollection.find({}).toArray(); // Fetch all tags summary documents
+            // Fetch only the "tags" field from the tags_summary collection
+            documents = await tagsCollection.find({}, { projection: { tags: 1 } }).toArray(); 
         } else {
             const apiCollection = db.collection('api-img'); // Existing collection
             documents = await apiCollection.find({})
@@ -65,7 +66,7 @@ exports.handler = async (event, context) => {
             };
         }
 
-        // Remove the "_id" field from each document
+        // Remove the "_id" field from each document if not in /tags route
         const sanitizedDocuments = documents.map(({ _id, ...rest }) => rest);
 
         return {
