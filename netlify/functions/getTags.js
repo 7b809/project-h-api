@@ -26,7 +26,7 @@ exports.handler = async (event, context) => {
         try {
             await client.connect();
             const db = client.db('project-h');
-            const imgSummaryCollection = db.collection('img_summary');
+            const imgSummaryCollection = db.collection('tags_summary');
 
             // Fetch all tags (adjust the query based on your data structure)
             const results = await imgSummaryCollection.distinct('tags'); // Assuming 'tags' is the field for tags
